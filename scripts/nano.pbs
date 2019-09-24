@@ -1,0 +1,10 @@
+#!/bin/bash 
+#PBS -k o 
+#PBS -l nodes=nano2:ppn=2:gpus=1
+#PBS -l walltime=08:00:00
+#PBS -M yifanc3@illinois.edu
+#PBS -m abe 
+#PBS -N 128over5m6b_unet_Adadelta_der1_200w_65e
+source activate tf3.6-v2
+cd ~/segmentation/DEM_segmentation
+./scripts/train.sh
