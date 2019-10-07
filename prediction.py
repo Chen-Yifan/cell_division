@@ -17,21 +17,26 @@ import argparse
 
 #get arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset_path", type=str, default='/home/yifan/Github/segmentation_train/dataset/cityscapes_all')
-parser.add_argument("--ckpt_path", type=str, default='/media/exfat/yifan/rf_checkpoints/cityscapes_unet_100e/')
-parser.add_argument("--results_path", type=str, default='/media/exfat/yifan/rf_results/cityscapes_unet_100e/')
-parser.add_argument("--weights", type=str)
-parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--dataset_path", type=str, default='/home/yifanc3/dataset2/cell_dataset/')
+parser.add_argument("--ckpt_path", type=str, default='./checkpoints/tryout')
+parser.add_argument("--results_path", type=str, default='./results/tryout')
+parser.add_argument("--network", type=str, default='Unet')
+parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
-parser.add_argument("--opt", type=int, default=1)  
-parser.add_argument("--split", type=str, default='test')  
+parser.add_argument("--width", type=int, default=1920)
+parser.add_argument("--height", type=int, default=1440)
+parser.add_argument("--shape", type=int, default=480)
+parser.add_argument("--opt", type=int, default=1)
+parser.add_argument("--weights", type=str)
+parser.add_argument("--split", type=str, default='val')
 args = parser.parse_args()
 
-
 BATCH_SIZE = args.batch_size
-frame_path = os.path.join(args.dataset_path,'left_256')
-mask_path = os.path.join(args.dataset_path,'gtFine_256')
-test_x, test_y = xy_array(mask_path, frame_path, args.split)
+frame_path = os.path.join(args.dataset_path,'frames')
+mask_path = os.path.join(args.dataset_path,'masks')
+w,h = args.width, args.height
+shape = args.shape
+
 
 Model_dir = os.path.join(args.ckpt_path,args.weights)
 
@@ -52,7 +57,7 @@ else:
     opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
 m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score])
 
-
+test_x, test_y = xy_array(mask_path, frame_path, 'val', w, h, cl=2)
 score = m.evaluate(test_x/255, test_y, verbose=0)
 # NO_OF_TEST_IMAGES = test_x.shape[0]
 # test_gen = testGen(test_x/255, test_y, BATCH_SIZE)
@@ -67,9 +72,9 @@ with open(os.path.join(args.ckpt_path,'output%s.txt'% args.weights[8:10]), "w") 
 predict_y = m.predict(test_x/255)
 # predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 
-result_path = args.results_path + args.weights[0:-5]+'-iou%.2f-results_%s'%(score[1]*100, args.split)
+result_path = os.path.join(args.results_path, args.weights[0:-5]+'-iou%.2f-results_%s'%(score[1]*100, args.split))
 print(result_path)
 mkdir(result_path)
 
 #save image
-save_results(mask_path, result_path, test_x, test_y, predict_y, split=args.split)
+save_results(result_path, test_x, test_y, predict_y, split=args.split)

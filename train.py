@@ -13,33 +13,29 @@ import os
 import argparse
 from model import *
 
-
 def get_callbacks(name_weights, path, patience_lr, opt=1):
-    if (opt == 3):
-        mcp_save = ModelCheckpoint(name_weights, save_best_only=False, monitor='iou_score', mode='max')
-    #     reduce_lr_loss = ReduceLROnPlateau(monitor='bce_jaccard_loss', factor=0.5, patience=patience_lr, verbose=1, epsilon=1e-4, mode='min')
-        logdir = os.path.join(path,'log')
-        tensorboard = TensorBoard(log_dir=logdir, histogram_freq=0,
+    mcp_save = ModelCheckpoint(name_weights, save_best_only=False, monitor='iou_score', mode='max')
+    reduce_lr_loss = ReduceLROnPlateau(factor=0.5)
+    logdir = os.path.join(path,'log')
+    tensorboard = TensorBoard(log_dir=logdir, histogram_freq=0,
                                 write_graph=True, write_images=True)
+    if (opt == 3):
         return [mcp_save, tensorboard]
         
     else:
-        mcp_save = ModelCheckpoint(name_weights, save_best_only=False, monitor='iou_score', mode='max')
-    #     reduce_lr_loss = ReduceLROnPlateau(monitor='bce_jaccard_loss', factor=0.5, patience=patience_lr, verbose=1, epsilon=1e-4, mode='min')
-        reduce_lr_loss = ReduceLROnPlateau(factor=0.5)
-        logdir = os.path.join(path,'log')
-        tensorboard = TensorBoard(log_dir=logdir, histogram_freq=0,
-                                write_graph=True, write_images=True)
         return [mcp_save, reduce_lr_loss, tensorboard]
 
 #get arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset_path", type=str, default='/home/yifan/Github/segmentation_train/dataset/cityscapes_all')
-parser.add_argument("--ckpt_path", type=str, default='/media/exfat/yifan/rf_checkpoints/cityscapes_unet_100e/')
-parser.add_argument("--results_path", type=str, default='/media/exfat/yifan/rf_results/cityscapes_unet_100e/')
+parser.add_argument("--dataset_path", type=str, default='/home/yifanc3/dataset2/cell_dataset/')
+parser.add_argument("--ckpt_path", type=str, default='./checkpoints/tryout')
+parser.add_argument("--results_path", type=str, default='./results/tryout')
 parser.add_argument("--network", type=str, default='Unet')
-parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--width", type=int, default=1920)
+parser.add_argument("--height", type=int, default=1440)
+parser.add_argument("--shape", type=int, default=480)
 parser.add_argument("--opt", type=int, default=1)
 
 args = parser.parse_args()
@@ -51,25 +47,27 @@ with open(os.path.join(args.ckpt_path,'args.txt'), "w") as file:
         file.write('%s: %s \n' % (str(arg),str(getattr(args, arg))))
 
 BATCH_SIZE = args.batch_size
-frame_path = os.path.join(args.dataset_path,'left_256')
-mask_path = os.path.join(args.dataset_path,'gtFine_256')
-
+frame_path = os.path.join(args.dataset_path,'frames')
+mask_path = os.path.join(args.dataset_path,'masks')
+w,h = args.width, args.height
+shape = args.shape
 
 # define model
+input_shape = (shape, shape, 3)
 if (args.network == 'Unet'):
-    m = Unet(classes = 20, input_shape=(256, 256, 3), activation='softmax')
+    m = Unet(classes = 2, input_shape=input_shape, activation='softmax')
 #     m = get_unet()
 elif (args.network == 'unet_noskip'):
-    m = unet_noskip()
+    m = unet_noskip(input_shape=input_shape)
 
 # load data to lists
-train_x, train_y, val_x, val_y, test_x, test_y = load_data(frame_path, mask_path)
+train_x, train_y, val_x, val_y = load_data(frame_path, mask_path, w, h)
 print('train_y.shape:',train_y.shape)
 
 NO_OF_TRAINING_IMAGES = train_x.shape[0]
 NO_OF_VAL_IMAGES = val_x.shape[0]
-NO_OF_TEST_IMAGES = test_x.shape[0]
-print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
+#NO_OF_TEST_IMAGES = test_x.shape[0]
+print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES)
 
 #DATA AUGMENTATION
 train_gen = trainGen(train_x, train_y, BATCH_SIZE)
@@ -85,7 +83,7 @@ else:
 m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score])
 
 # fit model
-weights_path = args.ckpt_path + 'weights.{epoch:02d}-{val_loss:.2f}-{val_iou_score:.2f}.hdf5'
+weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_score:.2f}.hdf5'
 callbacks = get_callbacks(weights_path, args.ckpt_path, 5, args.opt)
 history = m.fit_generator(train_gen, epochs=args.epochs,
                           steps_per_epoch = (NO_OF_TRAINING_IMAGES//BATCH_SIZE),
@@ -105,7 +103,7 @@ print('======Start Evaluating======')
 #don't use generator but directly from array
 # test_gen = testGen(test_x, test_y, BATCH_SIZE)
 # score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
-score = m.evaluate(test_x/255, test_y, verbose=0)
+score = m.evaluate(val_x/255, val_y, verbose=0)
 print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
 print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 with open(os.path.join(args.ckpt_path,'output.txt'), "w") as file:
@@ -113,12 +111,12 @@ with open(os.path.join(args.ckpt_path,'output.txt'), "w") as file:
     file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 
 print('======Start Testing======')
-predict_y = m.predict(test_x / 255)
+predict_y = m.predict(val_x / 255)
 
 #save image
 print('======Save Results======')
 mkdir(args.results_path)
-save_results(mask_path, args.results_path, test_x, test_y, predict_y, 'test')
+save_results(args.results_path, val_x, val_y, predict_y, 'val')
 
 
 
