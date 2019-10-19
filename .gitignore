@@ -1,3 +1,5 @@
+cell*
+dataset/*
 results/*
 checkpoints/*
 notebooks/.ipynb_checkpoints/*

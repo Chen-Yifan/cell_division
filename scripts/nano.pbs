@@ -1,10 +1,10 @@
 #!/bin/bash 
 #PBS -k o 
-#PBS -l nodes=nano2:ppn=2:gpus=1
+#PBS -l nodes=nano5:ppn=2:gpus=1
 #PBS -l walltime=08:00:00
 #PBS -M yifanc3@illinois.edu
 #PBS -m abe 
-#PBS -N cell_division_40epoch
+#PBS -N 480_40cm_noresize_adad
 source activate tf3.6-v2
 cd ~/segmentation/cell_division
 ./scripts/train.sh

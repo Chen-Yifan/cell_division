@@ -9,27 +9,51 @@ import re
 import glob
 from utils import *
 
-def resample_small_size(array, input_shape=(1440, 1920)):
-    '''array in shape (1440, 1920)'''
+def resample_small_size(array, input_shape=(1440, 1920),magnify=40):
+    '''This function: array in shape (1440, 1920) into 240x240'''
+    
     if array.ndim == 3:
         (h, w, c) = array.shape
+        mask = False
     else:
         (h,w) = array.shape
-        c = 0
-    s = 480
-    num_h = int(h/s)
-    num_w = int(w/s)
-    n = int(num_h*num_w)
-    if c:
-        out_array = np.empty((n, s, s, c)).astype(np.float32)
-    else:
-        out_array = np.empty((n, s, s, 2)).astype(np.uint8)
+        mask = True # if this is mask array input here, we need to use one-hot encoding
         
-        array = np.eye(2)[array]
+    ''' split by 480 and resize to 240'''
+    if (magnify == 40):
+        s = 480
+        num_h = int(h/s)
+        num_w = int(w/s)
+        n = int(num_h*num_w)
+        # loop to add each array to output array: out_array (list)  
+        out_array = [] 
+        for i in range(num_h):
+            for j in range(num_w):
+                 #select the specific part as the array to preprocess
+                if mask:
+                    im = array[i*s:(i+1)*s,j*s:(j+1)*s]
+                    resize_arr = scipy.misc.imresize(im, (240,240),interp='nearest')
+                    resize_arr = np.eye(2)[resize_arr]
+                else:
+                    im = array[i*s:(i+1)*s,j*s:(j+1)*s,:]
+                    resize_arr = scipy.misc.imresize(im, (240,240),interp='bilinear')
+                out_array.append(resize_arr)
     
-    for i in range(num_h):
-        for j in range(num_w):
-            out_array[i*num_w+j] = array[i*s:(i+1)*s,j*s:(j+1)*s,:]
+    #if magnify is 20, split by 240, no need to resize
+    else:
+        if mask:
+            array = np.eye(2)[array]
+        s = 240
+        num_h = int(h/s)
+        num_w = int(w/s)
+        n = int(num_h*num_w)
+        # loop to add each array to output array: out_array (list)  
+        out_array = []
+        for i in range(num_h):
+            for j in range(num_w):
+                im = array[i*s:(i+1)*s,j*s:(j+1)*s,:] #select the specific part as the array to preprocess                   
+                out_array.append(im)
+                
     return out_array
 
     
@@ -38,36 +62,56 @@ def load_data(frame_path, mask_path, w, h):
     train_x, train_y = xy_array(mask_path, frame_path, 'train', w, h)
     val_x, val_y = xy_array(mask_path, frame_path, 'val', w, h)
 #     test_x, test_y = xy_array(mask_path, frame_path, 'test')
-
     return train_x, train_y, val_x, val_y
 
 def xy_array(mask_path, frame_path, split, w, h, cl=2):
+# use this to load all data if split = ''
     
     mask_path = os.path.join(mask_path, split)
     frame_path = os.path.join(frame_path, split)
     
     frame_files = os.listdir(frame_path)
-    
-    # binary encode   
     num_files = len(frame_files)
-    
-    n = int(w*h/(480**2))
-    
-    x = np.zeros((num_files*n, 480, 480, 3)).astype(np.float32)
-    y = np.zeros((num_files*n, 480, 480, cl)).astype(np.uint8)
+    # binary encode   
+    x = []
+    y = []
     
     for i in range(num_files):
-#         img = np.array(Image.open(os.path.join(frame_path, frame_files[i]))) # rescale to from 0-1
-#         mask = np.array(Image.open(os.path.join(mask_path, frame_files[i][:-7]+'label.png'))/255)
-        img = np.load(os.path.join(frame_path, frame_files[i]))
-        mask = np.load(os.path.join(mask_path, frame_files[i][:-7]+'label.npy'))
+        img = np.array(Image.open(os.path.join(frame_path, frame_files[i]))) # rescale to from 0-1
+        # 255 to 1
+        mask_name = frame_files[i].replace('RGB','label')
+        mask = np.array(Image.open(os.path.join(mask_path, mask_name)))/255
         mask = mask.astype(np.uint8)
-    
-        x[i*n:(i+1)*n] = resample_small_size(img, input_shape=(h,w))
-        y[i*n:(i+1)*n] = resample_small_size(mask, input_shape=(h,w))
         
-    return x,y
-         
+#         if '20min' in frame_files[i]:
+        x += resample_small_size(img, input_shape=(h,w), magnify=40)
+        y += resample_small_size(mask, input_shape=(h,w),magnify=40)
+#         else:
+#             x += resample_small_size(img, input_shape=(h,w), magnify=40)
+#             y += resample_small_size(mask, input_shape=(h,w),magnify=40)
+        
+    return np.array(x),np.array(y)
+
+
+def random_crop(img, random_crop_size):
+    # Note: image_data_format is 'channel_last'
+    assert img.shape[2] == 3
+    height, width = img.shape[0], img.shape[1]
+    dy, dx = random_crop_size
+    x = np.random.randint(0, width - dx + 1)
+    y = np.random.randint(0, height - dy + 1)
+    return img[y:(y+dy), x:(x+dx), :]
+
+def crop_generator(batches, crop_length): # change to enable x and y together
+    """Take as input a Keras ImageGen (Iterator) and generate random
+    crops from the image batches generated by the original iterator.
+    """
+    while True:
+        batch_x, batch_y = next(batches)
+        batch_crops = np.zeros((batch_x.shape[0], crop_length, crop_length, 3))
+        for i in range(batch_x.shape[0]):
+            batch_crops[i] = random_crop(batch_x[i], (crop_length, crop_length))
+        yield (batch_crops, batch_y)         
 
 def trainGen(train_x, train_y, batch_size):
     '''
@@ -84,7 +128,7 @@ def trainGen(train_x, train_y, batch_size):
                     shear_range=0.05,
                     zoom_range=0.05,
                     horizontal_flip=True,
-                    fill_mode='nearest')
+                    fill_mode='wrap')
     
     y_gen_args = dict(
                     rotation_range=0.2,
@@ -93,7 +137,7 @@ def trainGen(train_x, train_y, batch_size):
                     shear_range=0.05,
                     zoom_range=0.05,
                     horizontal_flip=True,
-                    fill_mode='nearest')
+                    fill_mode='wrap')
     
     img_datagen = ImageDataGenerator(**x_gen_args)
     mask_datagen = ImageDataGenerator(**y_gen_args)
@@ -104,7 +148,9 @@ def trainGen(train_x, train_y, batch_size):
     seed = 2018
     img_gen = img_datagen.flow(train_x, seed = seed, batch_size=batch_size, shuffle=True)#shuffling
     mask_gen = mask_datagen.flow(train_y, seed = seed, batch_size=batch_size, shuffle=True)
+    
     train_gen = zip(img_gen, mask_gen)
+#    train_crops = crop_generator(train_gen, 224)
 
     return train_gen
 
@@ -133,8 +179,5 @@ def save_results(result_dir, test_x, test_y, predict_y, split='test'):
         # 256,256,1 -- id --> change to color
         gt = test_y[i].astype('uint8')
         pred = predict_y[i].astype('uint8')
-        imageio.imwrite(os.path.join(result_dir, str(i) + '_gt.png'), gt)
-        imageio.imwrite(os.path.join(result_dir, str(i) + '_pred.png'), pred)
-        
-        np.save(os.path.join(result_dir, str(i) + '_gt.npy'), gt*255)
-        np.save(os.path.join(result_dir, str(i) + '_pred.npy'), pred*255)
+        imageio.imwrite(os.path.join(result_dir, str(i) + '_gt.png'), gt*255)
+        imageio.imwrite(os.path.join(result_dir, str(i) + '_pred.png'), pred*255)

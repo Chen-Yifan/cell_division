@@ -27,7 +27,7 @@ def get_callbacks(name_weights, path, patience_lr, opt=1):
 
 #get arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset_path", type=str, default='/home/yifanc3/dataset2/cell_dataset/')
+parser.add_argument("--dataset_path", type=str, default='./dataset/')
 parser.add_argument("--ckpt_path", type=str, default='./checkpoints/tryout')
 parser.add_argument("--results_path", type=str, default='./results/tryout')
 parser.add_argument("--network", type=str, default='Unet')
@@ -35,7 +35,7 @@ parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--width", type=int, default=1920)
 parser.add_argument("--height", type=int, default=1440)
-parser.add_argument("--shape", type=int, default=480)
+parser.add_argument("--shape", type=int, default=240)
 parser.add_argument("--opt", type=int, default=1)
 
 args = parser.parse_args()
@@ -58,16 +58,26 @@ if (args.network == 'Unet'):
     m = Unet(classes = 2, input_shape=input_shape, activation='softmax')
 #     m = get_unet()
 elif (args.network == 'unet_noskip'):
-    m = unet_noskip(input_shape=input_shape)
+    m = unet_noskip(n_classes=2, input_shape=input_shape)
+elif (args.network == 'unet'):
+    m = get_unet(n_classes=2,input_shape=input_shape)
 
 # load data to lists
-train_x, train_y, val_x, val_y = load_data(frame_path, mask_path, w, h)
-print('train_y.shape:',train_y.shape)
+x, y = xy_array(mask_path, frame_path, '', w, h, cl=2)
+assert len(x) == len(y)
+print('x,y shape', x.shape, y.shape)
 
-NO_OF_TRAINING_IMAGES = train_x.shape[0]
-NO_OF_VAL_IMAGES = val_x.shape[0]
-#NO_OF_TEST_IMAGES = test_x.shape[0]
-print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES)
+N = len(x)
+a = int(0.7*N)
+b = int(0.85*N)
+train_x, val_x, test_x = x[:a],x[a:b],x[b:]
+train_y, val_y, test_y = y[:a],y[a:b],y[b:]
+NO_OF_TRAINING_IMAGES = a
+NO_OF_VAL_IMAGES = b-a
+NO_OF_TEST_IMAGES = N-b
+
+print('train_y.shape:',train_y.shape)
+print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
 
 #DATA AUGMENTATION
 train_gen = trainGen(train_x, train_y, BATCH_SIZE)
@@ -103,7 +113,7 @@ print('======Start Evaluating======')
 #don't use generator but directly from array
 # test_gen = testGen(test_x, test_y, BATCH_SIZE)
 # score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
-score = m.evaluate(val_x/255, val_y, verbose=0)
+score = m.evaluate(test_x/255, test_y, verbose=0)
 print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
 print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 with open(os.path.join(args.ckpt_path,'output.txt'), "w") as file:
@@ -111,12 +121,12 @@ with open(os.path.join(args.ckpt_path,'output.txt'), "w") as file:
     file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 
 print('======Start Testing======')
-predict_y = m.predict(val_x / 255)
+predict_y = m.predict(test_x / 255)
 
 #save image
 print('======Save Results======')
 mkdir(args.results_path)
-save_results(args.results_path, val_x, val_y, predict_y, 'val')
+save_results(args.results_path, test_x, test_y, predict_y, 'test')
 
 
 
