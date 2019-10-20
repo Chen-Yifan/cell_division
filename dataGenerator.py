@@ -93,14 +93,14 @@ def xy_array(mask_path, frame_path, split, w, h, cl=2):
     return np.array(x),np.array(y)
 
 
-def random_crop(img, random_crop_size):
+def random_crop(img, mask, random_crop_size):
     # Note: image_data_format is 'channel_last'
     # assert img.shape[2] == 3
     height, width = img.shape[0], img.shape[1]
     dy, dx = random_crop_size
     x = np.random.randint(0, width - dx + 1)
     y = np.random.randint(0, height - dy + 1)
-    return img[y:(y+dy), x:(x+dx), :]
+    return img[y:(y+dy), x:(x+dx), :], mask[y:(y+dy), x:(x+dx), :]
 
 def crop_generator(batches, crop_length): # change to enable x and y together
     """Take as input a Keras ImageGen (Iterator) and generate random
@@ -111,9 +111,8 @@ def crop_generator(batches, crop_length): # change to enable x and y together
         batch_crop_x = np.zeros((batch_x.shape[0], crop_length, crop_length, 3))
         batch_crop_y = np.zeros((batch_y.shape[0], crop_length, crop_length, 2))
         for i in range(batch_x.shape[0]):
-            batch_crop_x[i] = random_crop(batch_x[i], (crop_length, crop_length))
-            batch_crop_y[i] = random_crop(batch_y[i], (crop_length, crop_length))
-        yield (batch_crop_x, batch_crop_y)         
+            batch_crop_x[i], batch_crop_y[i] = random_crop(batch_x[i], batch_y[i], (crop_length, crop_length))
+        yield (batch_crop_x, batch_crop_y)     
 
 def trainGen(train_x, train_y, batch_size):
     '''
@@ -154,7 +153,7 @@ def trainGen(train_x, train_y, batch_size):
     train_gen = zip(img_gen, mask_gen)
     train_crops = crop_generator(train_gen, 224)
 
-    return train_gen
+    return train_crops
 
 
 def testGen(val_x, val_y, batch_size):
