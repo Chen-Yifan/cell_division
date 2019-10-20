@@ -37,6 +37,7 @@ parser.add_argument("--width", type=int, default=1920)
 parser.add_argument("--height", type=int, default=1440)
 parser.add_argument("--shape", type=int, default=240)
 parser.add_argument("--opt", type=int, default=1)
+parser.add_argument("--split", type=str, default='test')
 
 args = parser.parse_args()
 
@@ -81,7 +82,7 @@ print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IM
 
 #DATA AUGMENTATION
 train_gen = trainGen(train_x, train_y, BATCH_SIZE)
-val_gen = testGen(val_x, val_y, BATCH_SIZE)
+val_gen = testGen(val_x, val_y, 1)
 
 #optimizer
 if args.opt==1:
@@ -90,7 +91,7 @@ elif args.opt==2:
     opt = SGD(lr=0.01, decay=1e-6, momentum=0.99, nesterov=True)
 else:
     opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
-m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score])
+m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score, iou_label, f1_score1, per_pixel_acc])
 
 # fit model
 weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_score:.2f}.hdf5'
@@ -98,7 +99,7 @@ callbacks = get_callbacks(weights_path, args.ckpt_path, 5, args.opt)
 history = m.fit_generator(train_gen, epochs=args.epochs,
                           steps_per_epoch = (NO_OF_TRAINING_IMAGES//BATCH_SIZE),
                           validation_data=val_gen,
-                          validation_steps=(NO_OF_VAL_IMAGES//BATCH_SIZE),
+                          validation_steps=NO_OF_VAL_IMAGES//BATCH_SIZE,
                           shuffle = True,
                           callbacks=callbacks)
 #save model structure
@@ -115,11 +116,15 @@ print('======Start Evaluating======')
 test_gen = testGen(test_x, test_y, BATCH_SIZE)
 score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 # score = m.evaluate(test_x/255, test_y, verbose=0)
-print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
-print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 with open(os.path.join(args.ckpt_path,'output.txt'), "w") as file:
-    file.write("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
-    file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
+
+message = ''
+for j in range(11):
+    print("%s: %.2f%%" % (m.metrics_names[j], score[j]*100))
+    message += "%s: %.2f%% \n" % (m.metrics_names[j], score[j]*100)
+        
+with open(os.path.join(args.ckpt_path,'output_%s.txt') %args.epochs, "w") as file:           file.write(message)
+    file.write('\n')
 
 print('======Start Testing======')
 predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)

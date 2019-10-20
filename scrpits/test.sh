@@ -1,9 +1,8 @@
 python prediction.py \
---ckpt_path ./checkpoints/40epoch \
---results_path ./results/40epoch \
+--ckpt_path ./checkpoints/224random_unet_adadelta_50e \
+--results_path ./results/224random_unet_adadelta_50e \
 --network Unet \
---epochs 3 \
---batch_size 8 \
---opt 1 \
---split val \
---weights weights.36-0.06-0.76.hdf5
+--epochs 47 \
+--batch_size 1 \
+--opt 0 \
+--split test \

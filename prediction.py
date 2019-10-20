@@ -78,7 +78,8 @@ NO_OF_TEST_IMAGES = N-b
 
 print('train_y.shape:',train_y.shape)
 print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
-score = m.evaluate(test_x/255, test_y, verbose=0)
+test_gen = testGen(test_x, test_y, BATCH_SIZE)
+score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 
 print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
 print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
@@ -86,8 +87,7 @@ with open(os.path.join(args.ckpt_path,'output%s.txt'% args.epochs), "w") as file
     file.write("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
     file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 
-predict_y = m.predict(test_x/255)
-# predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
+predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 
 result_path = os.path.join(args.results_path, 'weights.%s-iou%.2f-results-%s'%(args.epochs,score[1]*100, args.split))
 print(result_path)
