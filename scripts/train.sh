@@ -4,4 +4,5 @@ python train.py \
 --network unet \
 --epochs 40 \
 --batch_size 16 \
+--shape 224 \
 --opt 0

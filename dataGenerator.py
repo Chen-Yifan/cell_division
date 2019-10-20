@@ -95,7 +95,7 @@ def xy_array(mask_path, frame_path, split, w, h, cl=2):
 
 def random_crop(img, random_crop_size):
     # Note: image_data_format is 'channel_last'
-    assert img.shape[2] == 3
+    # assert img.shape[2] == 3
     height, width = img.shape[0], img.shape[1]
     dy, dx = random_crop_size
     x = np.random.randint(0, width - dx + 1)
@@ -108,10 +108,12 @@ def crop_generator(batches, crop_length): # change to enable x and y together
     """
     while True:
         batch_x, batch_y = next(batches)
-        batch_crops = np.zeros((batch_x.shape[0], crop_length, crop_length, 3))
+        batch_crop_x = np.zeros((batch_x.shape[0], crop_length, crop_length, 3))
+        batch_crop_y = np.zeros((batch_y.shape[0], crop_length, crop_length, 2))
         for i in range(batch_x.shape[0]):
-            batch_crops[i] = random_crop(batch_x[i], (crop_length, crop_length))
-        yield (batch_crops, batch_y)         
+            batch_crop_x[i] = random_crop(batch_x[i], (crop_length, crop_length))
+            batch_crop_y[i] = random_crop(batch_y[i], (crop_length, crop_length))
+        yield (batch_crop_x, batch_crop_y)         
 
 def trainGen(train_x, train_y, batch_size):
     '''
@@ -150,7 +152,7 @@ def trainGen(train_x, train_y, batch_size):
     mask_gen = mask_datagen.flow(train_y, seed = seed, batch_size=batch_size, shuffle=True)
     
     train_gen = zip(img_gen, mask_gen)
-#    train_crops = crop_generator(train_gen, 224)
+    train_crops = crop_generator(train_gen, 224)
 
     return train_gen
 
