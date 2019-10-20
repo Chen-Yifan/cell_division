@@ -17,7 +17,7 @@ import argparse
 
 #get arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset_path", type=str, default='/home/yifanc3/dataset2/cell_dataset/')
+parser.add_argument("--dataset_path", type=str, default='./dataset/')
 parser.add_argument("--ckpt_path", type=str, default='./checkpoints/tryout')
 parser.add_argument("--results_path", type=str, default='./results/tryout')
 parser.add_argument("--network", type=str, default='Unet')
@@ -27,7 +27,6 @@ parser.add_argument("--width", type=int, default=1920)
 parser.add_argument("--height", type=int, default=1440)
 parser.add_argument("--shape", type=int, default=480)
 parser.add_argument("--opt", type=int, default=1)
-parser.add_argument("--weights", type=str)
 parser.add_argument("--split", type=str, default='val')
 args = parser.parse_args()
 
@@ -37,8 +36,14 @@ mask_path = os.path.join(args.dataset_path,'masks')
 w,h = args.width, args.height
 shape = args.shape
 
-
-Model_dir = os.path.join(args.ckpt_path,args.weights)
+#9-11 the epoch
+weights = os.listdir(args.ckpt_path)
+weight = None
+for i in weights:
+    if i[8:10] == str(args.epochs):
+        weight = i
+print(weight)
+Model_dir = os.path.join(args.ckpt_path,weight)
 
 #model 
 json_path = os.path.join(args.ckpt_path,'model.json')
@@ -57,22 +62,34 @@ else:
     opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
 m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score])
 
-test_x, test_y = xy_array(mask_path, frame_path, 'val', w, h, cl=2)
+# load data to lists
+x, y = xy_array(mask_path, frame_path, '', w, h, cl=2)
+assert len(x) == len(y)
+print('x,y shape', x.shape, y.shape)
+
+N = len(x)
+a = int(0.7*N)
+b = int(0.85*N)
+train_x, val_x, test_x = x[:a],x[a:b],x[b:]
+train_y, val_y, test_y = y[:a],y[a:b],y[b:]
+NO_OF_TRAINING_IMAGES = a
+NO_OF_VAL_IMAGES = b-a
+NO_OF_TEST_IMAGES = N-b
+
+print('train_y.shape:',train_y.shape)
+print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
 score = m.evaluate(test_x/255, test_y, verbose=0)
-# NO_OF_TEST_IMAGES = test_x.shape[0]
-# test_gen = testGen(test_x/255, test_y, BATCH_SIZE)
-# score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 
 print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
 print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
-with open(os.path.join(args.ckpt_path,'output%s.txt'% args.weights[8:10]), "w") as file:
+with open(os.path.join(args.ckpt_path,'output%s.txt'% args.epochs), "w") as file:
     file.write("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
     file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
 
 predict_y = m.predict(test_x/255)
 # predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 
-result_path = os.path.join(args.results_path, args.weights[0:-5]+'-iou%.2f-results_%s'%(score[1]*100, args.split))
+result_path = os.path.join(args.results_path, 'weights.%s-iou%.2f-results-%s'%(args.epochs,score[1]*100, args.split))
 print(result_path)
 mkdir(result_path)
 

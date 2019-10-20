@@ -1,9 +1,8 @@
 python prediction.py \
---ckpt_path ./checkpoints/40epoch \
---results_path ./results/40epoch \
+--ckpt_path ./checkpoints/480_40cm_noresize_try \
+--results_path ./results/480_40cm_noresize_try \
 --network Unet \
---epochs 3 \
---batch_size 8 \
+--epochs 26 \
+--batch_size 16 \
 --opt 1 \
---split val \
---weights weights.36-0.06-0.76.hdf5
+--split test

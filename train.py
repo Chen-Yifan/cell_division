@@ -125,8 +125,9 @@ predict_y = m.predict(test_x / 255)
 
 #save image
 print('======Save Results======')
-mkdir(args.results_path)
-save_results(args.results_path, test_x, test_y, predict_y, 'test')
+result_path = args.results_path +'weights.%s-results-%s'%(args.epochs, args.split)
+mkdir(results_path)
+save_results(results_path, test_x, test_y, predict_y, 'test')
 
 
 
