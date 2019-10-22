@@ -14,7 +14,7 @@ from keras.optimizers import SGD,Adam,Adadelta
 from dataGenerator import *
 from keras.models import model_from_json
 import argparse
-
+from metrics import *
 #get arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset_path", type=str, default='./dataset/')
@@ -31,7 +31,7 @@ parser.add_argument("--split", type=str, default='val')
 args = parser.parse_args()
 
 BATCH_SIZE = args.batch_size
-frame_path = os.path.join(args.dataset_path,'frames')
+frame_path = os.path.join(args.dataset_path,'frames_norm')
 mask_path = os.path.join(args.dataset_path,'masks')
 w,h = args.width, args.height
 shape = args.shape
@@ -60,7 +60,7 @@ elif args.opt==2:
     opt = SGD(lr=0.01, decay=1e-6, momentum=0.99, nesterov=True)
 else:
     opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
-m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score])
+m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score, iou_label, per_pixel_acc, f1score_1])
 
 # load data to lists
 x, y = xy_array(mask_path, frame_path, '', w, h, cl=2)
@@ -78,16 +78,22 @@ NO_OF_TEST_IMAGES = N-b
 
 print('train_y.shape:',train_y.shape)
 print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
-test_gen = testGen(test_x, test_y, BATCH_SIZE)
-score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
+# test_gen = testGen(test_x, test_y, BATCH_SIZE)
+# score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES),verbose=0)
+test_x, test_y = resize_val(test_x, test_y, 224)
+score = m.evaluate(test_x/255, test_y, verbose=0)
 
-print("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
-print("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
-with open(os.path.join(args.ckpt_path,'output%s.txt'% args.epochs), "w") as file:
-    file.write("%s: %.2f%%" % (m.metrics_names[0], score[0]*100))
-    file.write("%s: %.2f%%" % (m.metrics_names[1], score[1]*100))
+message = ''
+for j in range(5):
+    print("%s: %.2f%%" % (m.metrics_names[j], score[j]*100))
+    message += "%s: %.2f%% \n" % (m.metrics_names[j], score[j]*100)
 
-predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
+with open(os.path.join(args.ckpt_path,'output_%s.txt') %args.epochs, "w") as file:
+    file.write(message)
+    file.write('\n')
+
+# predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
+predict_y = m.predict(test_x/255, verbose=0)
 
 result_path = os.path.join(args.results_path, 'weights.%s-iou%.2f-results-%s'%(args.epochs,score[1]*100, args.split))
 print(result_path)

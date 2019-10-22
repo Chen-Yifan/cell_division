@@ -91,6 +91,18 @@ def xy_array(mask_path, frame_path, split, w, h, cl=2):
 #             y += resample_small_size(mask, input_shape=(h,w),magnify=40)
         
     return np.array(x),np.array(y)
+
+def resize_val(x, y, shape=224):
+    n = x.shape[0]
+    ret_x = []
+    ret_y = []
+    for i in range(n):
+        im = scipy.misc.imresize(x[i], (shape,shape),interp='nearest')
+        ret_x.append(im)
+        mask = np.array(Image.fromarray(y[i,:,:,1]).resize((shape,shape), Image.NEAREST)).astype('uint8')
+        ret_y.append(np.eye(2)[mask])
+    return np.array(ret_x), np.array(ret_y)
+
 def center_crop(img, mask, random_crop_size):
     height, width = img.shape[0], img.shape[1]
     dy, dx = random_crop_size
@@ -172,8 +184,8 @@ def testGen(val_x, val_y, batch_size):
     mask_datagen.fit(val_y)
     
     seed = 20
-    img_gen = img_datagen.flow(val_x, seed=seed, batch_size=batch_size, shuffle=True)
-    mask_gen = mask_datagen.flow(val_y, seed=seed, batch_size=batch_size, shuffle=True)
+    img_gen = img_datagen.flow(val_x, seed=seed, batch_size=batch_size, shuffle=False)
+    mask_gen = mask_datagen.flow(val_y, seed=seed, batch_size=batch_size, shuffle=False)
     val_gen = zip(img_gen, mask_gen)    
     val_crops = crop_generator(val_gen, 224, random=False)    
     return val_crops
@@ -188,5 +200,7 @@ def save_results(result_dir, test_x, test_y, predict_y, split='test'):
         # 256,256,1 -- id --> change to color
         gt = test_y[i].astype('uint8')
         pred = predict_y[i].astype('uint8')
+        x = test_x[i]
+        imageio.imwrite(os.path.join(result_dir, str(i) + '_input.png'), x*255)
         imageio.imwrite(os.path.join(result_dir, str(i) + '_gt.png'), gt*255)
         imageio.imwrite(os.path.join(result_dir, str(i) + '_pred.png'), pred*255)
