@@ -67,6 +67,7 @@ elif (args.network == 'unet'):
 x, y = xy_array(mask_path, frame_path, '', w, h, cl=2)
 assert len(x) == len(y)
 print('x,y shape', x.shape, y.shape)
+print('hereh',np.max(x), np.min(x), np.unique(y))
 
 N = len(x)
 a = N - 11

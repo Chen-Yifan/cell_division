@@ -80,11 +80,11 @@ def xy_array(mask_path, frame_path, split, w, h, cl=2):
         img = np.array(Image.open(os.path.join(frame_path, frame_files[i])))
         mask_name = frame_files[i].replace('RGB','label')
         mask = np.array(Image.open(os.path.join(mask_path, mask_name)))/255
-        mask = mask.astype(np.uint8)
-        mask = np.eye(2)[mask]
+        mask = mask.astype('uint8')
+        mask = np.eye(2)[mask].astype('uint8')
         x.append(img)
         y.append(mask)
-    return np.array(x),np.array(y)
+    return np.array(x),np.array(y).astype('uint8')
 
 def resize_val(x, y, shape=224):
     n = x.shape[0]
@@ -109,6 +109,7 @@ def random_crop(img, mask, random_crop_size):
     # assert img.shape[2] == 3
     height, width = img.shape[0], img.shape[1]
     dy, dx = random_crop_size
+    mask = mask.astype('uint8')
     x = np.random.randint(0, width - dx + 1)
     y = np.random.randint(0, height - dy + 1)
     return img[y:(y+dy), x:(x+dx), :], mask[y:(y+dy), x:(x+dx), :]
