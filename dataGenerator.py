@@ -11,12 +11,11 @@ from utils import *
 
 def resample_small_size(array, input_shape=(1440, 1920),magnify=40):
     '''This function: array in shape (1440, 1920) into 240x240'''
-    
-    if array.ndim == 3:
+    if array.ndim == 3 and array.shape[2]==3:
         (h, w, c) = array.shape
         mask = False
     else:
-        (h,w) = array.shape
+        (h,w,c) = array.shape
         mask = True # if this is mask array input here, we need to use one-hot encoding
         
     ''' split by 480 and resize to 240'''
@@ -31,13 +30,13 @@ def resample_small_size(array, input_shape=(1440, 1920),magnify=40):
             for j in range(num_w):
                  #select the specific part as the array to preprocess
                 if mask:
-                    im = array[i*s:(i+1)*s,j*s:(j+1)*s]
-                    resize_arr = scipy.misc.imresize(im, (240,240),interp='nearest')
-                    resize_arr = np.eye(2)[resize_arr]
+                    im = array[i*s:(i+1)*s,j*s:(j+1)*s,:]
+#                     resize_arr = scipy.misc.imresize(im, (240,240),interp='nearest')
+#                     resize_arr = np.eye(2)[resize_arr]
                 else:
                     im = array[i*s:(i+1)*s,j*s:(j+1)*s,:]
-                    resize_arr = scipy.misc.imresize(im, (240,240),interp='bilinear')
-                out_array.append(resize_arr)
+#                     resize_arr = scipy.misc.imresize(im, (240,240),interp='bilinear')
+                out_array.append(im)
     
     #if magnify is 20, split by 240, no need to resize
     else:
@@ -66,6 +65,7 @@ def load_data(frame_path, mask_path, w, h):
 
 def xy_array(mask_path, frame_path, split, w, h, cl=2):
 # use this to load all data if split = ''
+    ''' return a x, y array with original shape'''
     
     mask_path = os.path.join(mask_path, split)
     frame_path = os.path.join(frame_path, split)
@@ -77,19 +77,13 @@ def xy_array(mask_path, frame_path, split, w, h, cl=2):
     y = []
     
     for i in range(num_files):
-        img = np.array(Image.open(os.path.join(frame_path, frame_files[i]))) # rescale to from 0-1
-        # 255 to 1
+        img = np.array(Image.open(os.path.join(frame_path, frame_files[i])))
         mask_name = frame_files[i].replace('RGB','label')
         mask = np.array(Image.open(os.path.join(mask_path, mask_name)))/255
         mask = mask.astype(np.uint8)
-        
-#         if '20min' in frame_files[i]:
-        x += resample_small_size(img, input_shape=(h,w), magnify=40)
-        y += resample_small_size(mask, input_shape=(h,w),magnify=40)
-#         else:
-#             x += resample_small_size(img, input_shape=(h,w), magnify=40)
-#             y += resample_small_size(mask, input_shape=(h,w),magnify=40)
-        
+        mask = np.eye(2)[mask]
+        x.append(img)
+        y.append(mask)
     return np.array(x),np.array(y)
 
 def resize_val(x, y, shape=224):
@@ -170,7 +164,7 @@ def trainGen(train_x, train_y, batch_size):
     mask_gen = mask_datagen.flow(train_y, seed = seed, batch_size=batch_size, shuffle=True)
     
     train_gen = zip(img_gen, mask_gen)
-    train_crops = crop_generator(train_gen, 224, random=True)
+    train_crops = crop_generator(train_gen, 480, random=True)
 
     return train_crops
 
@@ -187,7 +181,7 @@ def testGen(val_x, val_y, batch_size):
     img_gen = img_datagen.flow(val_x, seed=seed, batch_size=batch_size, shuffle=False)
     mask_gen = mask_datagen.flow(val_y, seed=seed, batch_size=batch_size, shuffle=False)
     val_gen = zip(img_gen, mask_gen)    
-    val_crops = crop_generator(val_gen, 224, random=False)    
+    val_crops = crop_generator(val_gen, 480, random=False)    
     return val_crops
 
 

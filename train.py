@@ -69,23 +69,36 @@ assert len(x) == len(y)
 print('x,y shape', x.shape, y.shape)
 
 N = len(x)
-a = int(0.7*N)
-b = int(0.85*N)
-train_x, val_x, test_x = x[:a],x[a:b],x[b:]
-train_y, val_y, test_y = y[:a],y[a:b],y[b:]
+a = N - 11
+b = N - 6
+train_x, val_x1, test_x1 = x[:a],x[a:b],x[b:]
+train_y, val_y1, test_y1 = y[:a],y[a:b],y[b:]
 
-val_x, val_y = resize_val(val_x, val_y, 224)
-test_x, test_y = resize_val(test_x, test_y, 224)
+val_x = []
+val_y = []
+for i in range(len(val_x1)):
+    val_x+=resample_small_size(val_x1[i])
+    val_y+=resample_small_size(val_y1[i])
+test_x = []
+test_y = []
+for i in range(len(test_x1)):
+    test_x+=resample_small_size(test_x1[i])
+    test_y+=resample_small_size(test_y1[i])
+    
+val_x = np.array(val_x)
+val_y = np.array(val_y)
+test_x = np.array(test_x)
+test_y = np.array(test_y)
 NO_OF_TRAINING_IMAGES = a
-NO_OF_VAL_IMAGES = b-a
-NO_OF_TEST_IMAGES = N-b
+NO_OF_VAL_IMAGES = len(val_x)
+NO_OF_TEST_IMAGES = len(test_x)
 
-print('train_y.shape:',train_y.shape)
+print('train_y.shape:',train_y.shape, test_y.shape, val_y.shape)
 print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
 
 #DATA AUGMENTATION
 train_gen = trainGen(train_x, train_y, BATCH_SIZE)
-val_gen = testGen(val_x, val_y, 1)
+# val_gen = testGen(val_x, val_y, 1)
 
 #optimizer
 if args.opt==1:
@@ -101,7 +114,7 @@ weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_sc
 callbacks = get_callbacks(weights_path, args.ckpt_path, 5, args.opt)
 history = m.fit_generator(train_gen, epochs=args.epochs,
                           steps_per_epoch = (NO_OF_TRAINING_IMAGES//BATCH_SIZE),
-                          validation_data=(val_x, val_y),
+                          validation_data=(val_x/255, val_y),
                           shuffle = True,
                           callbacks=callbacks)
 #save model structure

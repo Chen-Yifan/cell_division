@@ -1,9 +1,9 @@
 python train.py \
---ckpt_path ./checkpoints/224random_unet_adadelta_80e_norm_v2 \
---results_path ./results/224random_unet_adadelta_80e_norm_v2 \
+--ckpt_path ./checkpoints/random_unet_adadelta_80e_norm \
+--results_path ./results/random_unet_adadelta_80e_norm \
 --network unet \
---epochs 80 \
---batch_size 16 \
---shape 224 \
+--epochs 20 \
+--batch_size 4 \
+--shape 480 \
 --opt 0
 
