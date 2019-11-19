@@ -1,8 +1,9 @@
 python prediction.py \
---ckpt_path ./checkpoints/224random_unet_adadelta_80e_norm \
---results_path ./results/224random_unet_adadelta_80e_norm \
---network unet \
---epochs 50 \
+--ckpt_path ./checkpoints/224over_regularizationAdam_40e \
+--results_path ./results/224over_regularizationAdam_40e \
+--network build \
+--epochs 40 \
 --batch_size 1 \
+--shape 224 \
 --opt 0 \
 --split test \

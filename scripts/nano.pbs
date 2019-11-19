@@ -4,7 +4,7 @@
 #PBS -l walltime=08:00:00
 #PBS -M yifanc3@illinois.edu
 #PBS -m abe 
-#PBS -N cell_division_80epochv2
+#PBS -N 224over_regularizationAdam_40e_onlyflip
 source activate tf3.6-v2
 cd ~/segmentation/cell_division
 ./scripts/train.sh

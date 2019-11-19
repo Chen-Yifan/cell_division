@@ -5,6 +5,37 @@ import glob
 import skimage.io as io
 import tensorflow as tf
 
+
+def per_pixel_acc(y_true, y_pred): # class1 and class0 actually the same
+#     accuracy=(TP+TN)/(TP+TN+FP+FN)
+    #class 1
+    #y_pred = K.argmax(y_pred)
+    y_pred = K.cast(K.greater(y_pred,0.5),'float32')
+    #y_true = K.argmax(y_true)
+   # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
+    TP = tf.math.count_nonzero(y_pred * y_true)
+    TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
+    FP = tf.math.count_nonzero(y_pred*(1-y_true))
+    FN = tf.math.count_nonzero((1-y_pred)*y_true)
+    acc0 = (TP)/(TP+FN)
+    return acc0
+
+def iou_label(y_true, y_pred):
+    ''' 
+    calculate iou for label class
+    IOU = true_positive / (true_positive + false_positive + false_negative)
+    '''
+    y_pred = K.cast(K.greater(y_pred,0.5),'float32')
+#     y_pred = K.argmax(y_pred)
+#     y_pred = K.greater(y_pred, 0.3)
+#     y_true = K.argmax(y_true)
+   # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
+    TP = tf.math.count_nonzero(y_pred * y_true)
+    TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
+    FP = tf.math.count_nonzero(y_pred*(1-y_true))
+    FN = tf.math.count_nonzero((1-y_pred)*y_true)
+    return TP/(TP+FP+FN)
+
 def Mean_IOU(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1] #20
     print(nb_classes)
@@ -28,33 +59,33 @@ def Mean_IOU(y_true, y_pred):
     iou = tf.gather(iou, indices=tf.where(legal_labels))
     return K.mean(iou)
 
-def iou_label(y_true, y_pred):
-    ''' 
-    calculate iou for label class
-    IOU = true_positive / (true_positive + false_positive + false_negative)
-    '''
-    y_pred = K.argmax(y_pred)
-    y_true = K.argmax(y_true)
-   # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
-    TP = tf.math.count_nonzero(y_pred * y_true)
-    TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
-    FP = tf.math.count_nonzero(y_pred*(1-y_true))
-    FN = tf.math.count_nonzero((1-y_pred)*y_true)
-    return TP/(TP+FP+FN)
+# def iou_label(y_true, y_pred):
+#     ''' 
+#     calculate iou for label class
+#     IOU = true_positive / (true_positive + false_positive + false_negative)
+#     '''
+#     y_pred = K.argmax(y_pred)
+#     y_true = K.argmax(y_true)
+#    # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
+#     TP = tf.math.count_nonzero(y_pred * y_true)
+#     TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
+#     FP = tf.math.count_nonzero(y_pred*(1-y_true))
+#     FN = tf.math.count_nonzero((1-y_pred)*y_true)
+#     return TP/(TP+FP+FN)
 
-def iou_back(y_true, y_pred):
-    ''' 
-    calculate iou for background class
-    IOU = true_positive / (true_positive + false_positive + false_negative)
-    '''
-    y_pred = 1-K.argmax(y_pred)
-    y_true = 1-K.argmax(y_true)
-   # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
-    TP = tf.math.count_nonzero(y_pred * y_true)
-    TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
-    FP = tf.math.count_nonzero(y_pred*(1-y_true))
-    FN = tf.math.count_nonzero((1-y_pred)*y_true)
-    return TP/(TP+FP+FN)
+# def iou_back(y_true, y_pred):
+#     ''' 
+#     calculate iou for background class
+#     IOU = true_positive / (true_positive + false_positive + false_negative)
+#     '''
+#     y_pred = 1-K.argmax(y_pred)
+#     y_true = 1-K.argmax(y_true)
+#    # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
+#     TP = tf.math.count_nonzero(y_pred * y_true)
+#     TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
+#     FP = tf.math.count_nonzero(y_pred*(1-y_true))
+#     FN = tf.math.count_nonzero((1-y_pred)*y_true)
+#     return TP/(TP+FP+FN)
 
 def accuracy(y_true, y_pred):
     '''calculate classification accuracy'''
@@ -67,18 +98,18 @@ def accuracy(y_true, y_pred):
     acc = (TP+TN)/(TP+TN+FP+FN)
     return acc
 
-def per_pixel_acc(y_true, y_pred): # class1 and class0 actually the same
-#     accuracy=(TP+TN)/(TP+TN+FP+FN)
-    #class 1
-    y_pred = K.argmax(y_pred)
-    y_true = K.argmax(y_true)
-   # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
-    TP = tf.math.count_nonzero(y_pred * y_true)
-    TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
-    FP = tf.math.count_nonzero(y_pred*(1-y_true))
-    FN = tf.math.count_nonzero((1-y_pred)*y_true)
-    acc0 = (TP+TN)/(TP+TN+FP+FN)
-    return acc0
+# def per_pixel_acc(y_true, y_pred): # class1 and class0 actually the same
+# #     accuracy=(TP+TN)/(TP+TN+FP+FN)
+#     #class 1
+#     y_pred = K.argmax(y_pred)
+#     y_true = K.argmax(y_true)
+#    # TP = tf.compat.v2.math.count_nonzero(y_pred * y_true)
+#     TP = tf.math.count_nonzero(y_pred * y_true)
+#     TN = tf.math.count_nonzero((1-y_pred)*(1-y_true))
+#     FP = tf.math.count_nonzero(y_pred*(1-y_true))
+#     FN = tf.math.count_nonzero((1-y_pred)*y_true)
+#     acc0 = (TP+TN)/(TP+TN+FP+FN)
+#     return acc0
 
 def precision_1(y_true, y_pred):
     """Precision metric.

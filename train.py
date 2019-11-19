@@ -6,24 +6,25 @@ from keras.optimizers import SGD,Adam,Adadelta
 from keras.callbacks import TensorBoard
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import ReduceLROnPlateau
-from dataGenerator import *
+from custom_generator import *
+from load_data import *
 from utils import *
 from metrics import *
 import os
 import argparse
 from model import *
+from sklearn.model_selection import train_test_split
+from visualize import *
 
-def get_callbacks(name_weights, path, patience_lr, opt=1):
-    mcp_save = ModelCheckpoint(name_weights, save_best_only=False, monitor='iou_score', mode='max')
-    reduce_lr_loss = ReduceLROnPlateau(factor=0.5)
-    logdir = os.path.join(path,'log')
+def get_callbacks(weights_path, model_path, patience_lr):
+
+    logdir = os.path.join(model_path,'log')
     tensorboard = TensorBoard(log_dir=logdir, histogram_freq=0,
-                                write_graph=True, write_images=True)
-    if (opt == 3):
+                            write_graph=True, write_images=True)
+    if weights_path:
+        mcp_save = ModelCheckpoint(weights_path, save_best_only=False)
         return [mcp_save, tensorboard]
-        
-    else:
-        return [mcp_save, reduce_lr_loss, tensorboard]
+    return [tensorboard]
 
 #get arguments
 parser = argparse.ArgumentParser()
@@ -33,14 +34,15 @@ parser.add_argument("--results_path", type=str, default='./results/tryout')
 parser.add_argument("--network", type=str, default='Unet')
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
-parser.add_argument("--width", type=int, default=1920)
-parser.add_argument("--height", type=int, default=1440)
+parser.add_argument("--w", type=int, default=1920)
+parser.add_argument("--h", type=int, default=1440)
 parser.add_argument("--shape", type=int, default=240)
 parser.add_argument("--opt", type=int, default=1)
 parser.add_argument("--split", type=str, default='test')
+parser.add_argument("--learn_rate", type=float, default=3e-4)
+parser.add_argument("--num_filters", type=int, default=112)
 
 args = parser.parse_args()
-
 mkdir(args.ckpt_path)
 with open(os.path.join(args.ckpt_path,'args.txt'), "w") as file:
     for arg in vars(args):
@@ -50,8 +52,38 @@ with open(os.path.join(args.ckpt_path,'args.txt'), "w") as file:
 BATCH_SIZE = args.batch_size
 frame_path = os.path.join(args.dataset_path,'frames')
 mask_path = os.path.join(args.dataset_path,'masks')
-w,h = args.width, args.height
+w,h = args.w, args.h
 shape = args.shape
+num_filters = args.num_filters
+
+# load data to lists
+frame_data, mask_data = xy_array(mask_path, frame_path, '', w, h,(shape,shape), cl=2)
+assert len(frame_data) == len(mask_data)
+
+print('x,y shape', frame_data.shape, mask_data.shape)
+print('point1, finished load data')
+
+print('point2, shape frame mask', frame_data.shape, mask_data.shape)
+'''2. split train_val_test:
+        input_train/val/test
+        label_train/val/test  '''
+train_x, test_x, train_y, test_y = train_test_split(
+            frame_data, mask_data, test_size=0.15, shuffle=False)
+
+train_x, val_x, train_y, val_y = train_test_split(
+            frame_data, mask_data, test_size=0.1, shuffle=False)
+
+mkdir(args.results_path)
+np.save(args.results_path + '/inputs.npy', test_x)
+np.save(args.results_path + '/gt_labels.npy', test_y)
+
+print('point3, shape frame mask', train_x.shape, train_y.shape)
+n_train, n_test, n_val = len(train_x), len(test_x), len(val_x)
+print('***** #train: #test: #val = %d : %d :%d ******'%(n_train, n_test, n_val))
+
+#DATA AUGMENTATION
+train_gen = trainGen(train_x, train_y, BATCH_SIZE)
+# val_gen = testGen(val_x, val_y, 1)
 
 # define model
 input_shape = (shape, shape, 3)
@@ -62,46 +94,18 @@ elif (args.network == 'unet_noskip'):
     m = unet_noskip(n_classes=2, input_shape=input_shape)
 elif (args.network == 'unet'):
     m = get_unet(n_classes=2,input_shape=input_shape)
-
-# load data to lists
-x, y = xy_array(mask_path, frame_path, '', w, h, cl=2)
-assert len(x) == len(y)
-print('x,y shape', x.shape, y.shape)
-
-N = len(x)
-a = int(0.7*N)
-b = int(0.85*N)
-train_x, val_x, test_x = x[:a],x[a:b],x[b:]
-train_y, val_y, test_y = y[:a],y[a:b],y[b:]
-
-val_x, val_y = resize_val(val_x, val_y, 224)
-test_x, test_y = resize_val(test_x, test_y, 224)
-NO_OF_TRAINING_IMAGES = a
-NO_OF_VAL_IMAGES = b-a
-NO_OF_TEST_IMAGES = N-b
-
-print('train_y.shape:',train_y.shape)
-print('train: val: test', NO_OF_TRAINING_IMAGES, NO_OF_VAL_IMAGES, NO_OF_TEST_IMAGES)
-
-#DATA AUGMENTATION
-train_gen = trainGen(train_x, train_y, BATCH_SIZE)
-val_gen = testGen(val_x, val_y, 1)
-
-#optimizer
-if args.opt==1:
-    opt= Adam(lr = 1e-4)
-elif args.opt==2:
-    opt = SGD(lr=0.01, decay=1e-6, momentum=0.99, nesterov=True)
 else:
-    opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
-m.compile(optimizer=opt, loss='categorical_crossentropy', metrics=[iou_score, iou_label, f1score_1, per_pixel_acc])
+    learn_rate = 0.0001
+    drop = 0.15
+    num_filter = 3
+    m = build_model(shape, learn_rate, 1e-6, drop, 3, 'he_normal', num_filters)
 
 # fit model
-weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_score:.2f}.hdf5'
-callbacks = get_callbacks(weights_path, args.ckpt_path, 5, args.opt)
+weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_label:.2f}.hdf5'
+callbacks = get_callbacks(weights_path, args.ckpt_path, 5)
 history = m.fit_generator(train_gen, epochs=args.epochs,
-                          steps_per_epoch = (NO_OF_TRAINING_IMAGES//BATCH_SIZE),
-                          validation_data=(val_x, val_y),
+                          steps_per_epoch = (n_train//BATCH_SIZE),
+                          validation_data=(val_x/255, val_y),
                           shuffle = True,
                           callbacks=callbacks)
 #save model structure
@@ -120,7 +124,7 @@ BATCH_SIZE = 1 # for test
 # score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 score = m.evaluate(test_x/255, test_y, verbose=0)
 message = ''
-for j in range(5):
+for j in range(len(score)):
     print("%s: %.2f%%" % (m.metrics_names[j], score[j]*100))
     message += "%s: %.2f%% \n" % (m.metrics_names[j], score[j]*100)
         
@@ -131,9 +135,29 @@ with open(os.path.join(args.ckpt_path,'output_%s.txt') %args.epochs, "w") as fil
 print('======Start Testing======')
 # predict_y = m.predict_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
 predict_y = m.predict(test_x/255)
+
 #save image
 print('======Save Results======')
-result_path = args.results_path +'weights.%s-results-%s'%(args.epochs, args.split)
-mkdir(results_path)
-save_results(results_path, test_x, test_y, predict_y, 'test')
+result_path = args.results_path +'/weights.%s-results-%s'%(args.epochs, args.split)
+print(result_path)
+mkdir(result_path)
+np.save(result_path + '/pred_labels.npy', predict_y)
+# save_results(results_path, test_x, test_y, predict_y, 'test')
 
+
+# visualize result
+img = test_x
+real = test_y
+pred = predict_y #after sigmoid 1 channel
+
+predicted_data = np.zeros(pred.shape)
+for i in range(pred.shape[0]):
+    for j in range(pred.shape[1]):
+        for k in range(pred.shape[2]):
+            if (pred[i,j,k]>=0.5):
+                predicted_data[i,j,k] =1
+            else:
+                predicted_data[i,j,k] =0
+
+for i in range(100):
+    visualize(result_path,img,real,pred,predicted_data,i)
