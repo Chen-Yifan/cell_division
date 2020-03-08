@@ -9,7 +9,7 @@ import re
 import glob
 from utils import *
 
-def resample_from_masks(array, input_shape=(1440, 1920),resize_shape=(224,224)):
+def resample_from_masks(array, input_shape=(1440, 1920),resize_shape=(224,224)): # 1 channel
     (h,w) = array.shape
     s = 480
     p = 240
@@ -20,28 +20,19 @@ def resample_from_masks(array, input_shape=(1440, 1920),resize_shape=(224,224)):
     for i in range(num_h):
         for j in range(num_w):
              #select the specific part as the array to preprocess
-            if mask:
                 im = array[i*p:(i*p+s),j*p:(j*p+s)]
-                resize_arr = scipy.misc.imresize(im, resize_shape,interp='nearest')
-                #im = np.eye(2)[im]
-            else:
-                im = array[i*p:(i*p+s),j*p:(j*p+s),:]
-                resize_arr = scipy.misc.imresize(im, resize_shape,interp='bilinear')
-            out_array.append(resize_arr)
-            
+                im = np.array(Image.fromarray(im).resize(resize_shape)) # default PIL.Image.NEAREST
+                # print('#######im.range',np.max(im),np.min(im),im.shape)
+                # im = np.eye(2)[im]
+                out_array.append(im)
     return out_array
 
-def resample_small_size(array, input_shape=(1440, 1920),resize_shape=(224,224)):
+def resample_from_frames(array, input_shape=(1440, 1920),resize_shape=(224,224)):
     '''This function: array in shape (1440, 1920) into 240x240'''
     
-    if array.ndim == 3:
-        (h, w, c) = array.shape
-        mask = False
-    else:
-        (h,w) = array.shape
-        mask = True # if this is mask array input here, we need to use one-hot encoding
-        
-    ''' split by 480 and resize to 240'''
+    (h, w, c) = array.shape
+
+    ''' split by 480 and resize'''
     s = 480
     p = 240
     num_h = int(h/240)-1
@@ -51,14 +42,15 @@ def resample_small_size(array, input_shape=(1440, 1920),resize_shape=(224,224)):
     for i in range(num_h):
         for j in range(num_w):
              #select the specific part as the array to preprocess
-            if mask:
-                im = array[i*p:(i*p+s),j*p:(j*p+s)]
-                resize_arr = scipy.misc.imresize(im, resize_shape,interp='nearest')
-                #im = np.eye(2)[im]
+            if c==2:
+                im = array[i*p:(i*p+s),j*p:(j*p+s),:]
+                resize = np.array(Image.fromarray(im[:,:,0]).resize(resize_shape,Image.BILINEAR))
+                resize = np.stack((resize, np.array(Image.fromarray(im[:,:,1]).resize(resize_shape,Image.BILINEAR)) ),axis=-1)
             else:
                 im = array[i*p:(i*p+s),j*p:(j*p+s),:]
-                resize_arr = scipy.misc.imresize(im, resize_shape,interp='bilinear')
-            out_array.append(resize_arr)
+                resize = np.array(Image.fromarray(im).resize(resize_shape,Image.BILINEAR))
+            # print('#######resize.range',np.max(resize),np.min(resize),resize.shape)
+            out_array.append(resize)
             
     return out_array
 
@@ -70,22 +62,20 @@ def load_data_array(mask_path, frame_path, w, h, resize_shape, n_channels=2):
     # binary encode   
     x = []
     y = []
-        
     for i in range(num_files):
-        if(n_channels = 2):
+        if frame_files[i][0]=='.':
+            continue
+        if(n_channels == 2):
             img = np.load(os.path.join(frame_path, frame_files[i]))
-            mask_name = frame_files[i].replace('.npy','-label.tif')
+            mask_name = frame_files[i].replace('.npy','-label.png')
         else:  
             img = np.array(Image.open(os.path.join(frame_path, frame_files[i]))) 
             mask_name = frame_files[i].replace('RGB','label')
             
-        print('#########Range of image, size of image', np.max(img), np.min(img), img.shape)
-        # 255 to 1
-        
-        mask = np.array(Image.open(os.path.join(mask_path, mask_name)))/255
+        mask = np.array(Image.open(os.path.join(mask_path, mask_name)))/255 # 255 to 1,0
         mask = mask.astype(np.uint8)
         
-        x += resample_small_size(img, (h,w), resize_shape)
+        x += resample_from_frames(img, (h,w), resize_shape)
         y += resample_from_masks(mask, (h,w), resize_shape)
 
     return np.array(x),np.array(y)

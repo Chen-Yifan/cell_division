@@ -1,7 +1,5 @@
 from segmentation_models import Unet
-# from segmentation_models.backbones import get_preprocessing
 from segmentation_models.losses import bce_jaccard_loss
-from segmentation_models.metrics import iou_score
 from keras.optimizers import SGD,Adam,Adadelta
 from keras.callbacks import TensorBoard
 from keras.callbacks import ModelCheckpoint
@@ -9,7 +7,7 @@ from keras.callbacks import ReduceLROnPlateau
 from custom_generator import *
 from load_data import *
 from utils import *
-from metrics import *
+# from metrics import *
 import os
 import argparse
 from model import *
@@ -36,6 +34,7 @@ parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--w", type=int, default=1920)
 parser.add_argument("--h", type=int, default=1440)
+parser.add_argument("--n_cl", type=int, default=3)
 parser.add_argument("--shape", type=int, default=240)
 parser.add_argument("--opt", type=int, default=1)
 parser.add_argument("--split", type=str, default='test')
@@ -44,6 +43,7 @@ parser.add_argument("--num_filters", type=int, default=112)
 
 args = parser.parse_args()
 mkdir(args.ckpt_path)
+
 with open(os.path.join(args.ckpt_path,'args.txt'), "w") as file:
     for arg in vars(args):
         print(arg, getattr(args, arg))
@@ -55,9 +55,10 @@ mask_path = os.path.join(args.dataset_path,'label')
 w,h = args.w, args.h
 shape = args.shape
 num_filters = args.num_filters
+n_cl = args.n_cl
 
 # load data to lists
-frame_data, mask_data = load_data_array(mask_path, frame_path, '', w, h,(shape,shape), cl=2)
+frame_data, mask_data = load_data_array(mask_path, frame_path, w, h,(shape,shape), 2)
 assert len(frame_data) == len(mask_data)
 
 print('x,y shape', frame_data.shape, mask_data.shape)
@@ -98,7 +99,7 @@ else:
     learn_rate = 0.0001
     drop = 0.15
     num_filter = 3
-    m = build_model(shape, learn_rate, 1e-6, drop, 3, 'he_normal', num_filters)
+    m = build_model(shape, learn_rate, 1e-6, drop, 3, 'he_normal', num_filters, n_cl)
 
 # fit model
 weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_label:.2f}.hdf5'
