@@ -1,5 +1,5 @@
 # Dataset 
-@ auther Yifan Chen
+@ author Yifan Chen
 
 ## channelB (*-B.tif)
 
