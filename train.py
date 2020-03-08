@@ -50,14 +50,14 @@ with open(os.path.join(args.ckpt_path,'args.txt'), "w") as file:
         file.write('%s: %s \n' % (str(arg),str(getattr(args, arg))))
 
 BATCH_SIZE = args.batch_size
-frame_path = os.path.join(args.dataset_path,'frames')
-mask_path = os.path.join(args.dataset_path,'masks')
+frame_path = os.path.join(args.dataset_path,'2channel_image')
+mask_path = os.path.join(args.dataset_path,'label')
 w,h = args.w, args.h
 shape = args.shape
 num_filters = args.num_filters
 
 # load data to lists
-frame_data, mask_data = xy_array(mask_path, frame_path, '', w, h,(shape,shape), cl=2)
+frame_data, mask_data = load_data_array(mask_path, frame_path, '', w, h,(shape,shape), cl=2)
 assert len(frame_data) == len(mask_data)
 
 print('x,y shape', frame_data.shape, mask_data.shape)
