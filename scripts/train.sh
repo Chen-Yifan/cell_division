@@ -1,5 +1,4 @@
 python train.py \
---dataset_path ~/Research/Cell_recognition/dataset/dataset/ \
 --ckpt_path ./checkpoints/tryout \
 --results_path ./results/tryout \
 --n_cl 2 \
