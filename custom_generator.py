@@ -113,16 +113,3 @@ def testGen(val_x, val_y, batch_size):
     return val_gen
 
 
-def save_results(result_dir, test_x, test_y, predict_y, split='test'):
-    
-    test_y = np.argmax(test_y, axis=-1).astype(np.uint8)
-    predict_y = np.argmax(predict_y, axis=-1).astype(np.uint8)
-    
-    for i in range(len(test_x)):
-        # 256,256,1 -- id --> change to color
-        gt = test_y[i].astype('uint8')
-        pred = predict_y[i].astype('uint8')
-        x = test_x[i]
-        imageio.imwrite(os.path.join(result_dir, str(i) + '_input.png'), x*255)
-        imageio.imwrite(os.path.join(result_dir, str(i) + '_gt.png'), gt*255)
-        imageio.imwrite(os.path.join(result_dir, str(i) + '_pred.png'), pred*255)

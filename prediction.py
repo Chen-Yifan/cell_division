@@ -8,13 +8,10 @@ import keras.backend as K
 import numpy as np
 from keras.optimizers import Adadelta, Adam
 import matplotlib.pyplot as plt
-from segmentation_models.losses import bce_jaccard_loss
-from segmentation_models.metrics import iou_score
 from keras.optimizers import SGD,Adam,Adadelta
 from custom_generator import *
 from load_data import *
 from keras.models import model_from_json
-from sklearn.model_selection import train_test_split
 import argparse
 from metrics import *
 from visualize import *
@@ -28,14 +25,11 @@ parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--w", type=int, default=1920)
 parser.add_argument("--h", type=int, default=1440)
-parser.add_argument("--shape", type=int, default=480)
-parser.add_argument("--opt", type=int, default=1)
-parser.add_argument("--split", type=str, default='val')
+parser.add_argument("--shape", type=int, default=112)
+parser.add_argument("--split", type=str, default='test')
 args = parser.parse_args()
 
 BATCH_SIZE = args.batch_size
-frame_path = os.path.join(args.dataset_path,'frames_norm')
-mask_path = os.path.join(args.dataset_path,'masks')
 w,h = args.w, args.h
 shape = args.shape
 
@@ -57,37 +51,11 @@ json_file.close()
 m = model_from_json(loaded_model_json)
 m.load_weights(Model_dir)
 
-# if args.opt==1:
-#     opt= Adam(lr = 1e-4)
-# elif args.opt==2:
-#     opt = SGD(lr=0.01, decay=1e-6, momentum=0.99, nesterov=True)
-# else:
-#     opt = Adadelta(lr=1, rho=0.95, epsilon=1e-08, decay=0.0)
+
 optimizer = Adam(lr=0.0001)
 m.compile(loss='binary_crossentropy', metrics=[iou_label, per_pixel_acc,'accuracy'], optimizer=optimizer)
 
-# load data to lists
-# frame_data, mask_data = xy_array(mask_path, frame_path, '', w, h,(shape,shape), cl=2)
-# assert len(frame_data) == len(mask_data)
-
-# print('x,y shape', frame_data.shape, mask_data.shape)
-# print('point1, finished load data')
-
-# print('point2, shape frame mask', frame_data.shape, mask_data.shape)
-# '''2. split train_val_test:
-#         input_train/val/test
-#         label_train/val/test  '''
-# train_x, test_x, train_y, test_y = train_test_split(
-#             frame_data, mask_data, test_size=0.15, shuffle=False)
-
-# train_x, val_x, train_y, val_y = train_test_split(
-#             frame_data, mask_data, test_size=0.1, shuffle=False)
-
-# print('point3, shape frame mask', train_x.shape, train_y.shape)
-# n_train, n_test, n_val = len(train_x), len(test_x), len(val_x)
-# print('***** #train: #test: #val = %d : %d :%d ******'%(n_train, n_test, n_val))
-
-#load data
+# load data
 test_x = np.load(args.results_path +'/inputs.npy')
 test_y = np.load(args.results_path +'/gt_labels.npy')
 
@@ -117,15 +85,7 @@ print('=====Visualize Results====')
 img = test_x
 real = test_y
 pred = predict_y #after sigmoid 1 channel
+predicted_data = (pred>0.5).astype('uint8')
 
-predicted_data = np.zeros(pred.shape)
-for i in range(pred.shape[0]):
-    for j in range(pred.shape[1]):
-        for k in range(pred.shape[2]):
-            if (pred[i,j,k]>=0.5):
-                predicted_data[i,j,k] =1
-            else:
-                predicted_data[i,j,k] =0
-
-for i in range(100):
-    visualize(result_path,img,real,pred,predicted_data,i)
+# for i in range(100):
+#     visualize(result_path,img,real,pred,predicted_data,i)

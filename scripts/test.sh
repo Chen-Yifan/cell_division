@@ -1,9 +1,8 @@
 python prediction.py \
---ckpt_path ./checkpoints/224over_regularizationAdam_40e \
---results_path ./results/224over_regularizationAdam_40e \
+--ckpt_path ./checkpoints/tryout \
+--results_path ./results/tryout \
 --network build \
---epochs 40 \
+--epochs 38 \
 --batch_size 1 \
---shape 224 \
---opt 0 \
+--shape 112 \
 --split test \

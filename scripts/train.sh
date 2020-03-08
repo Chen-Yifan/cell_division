@@ -5,4 +5,4 @@ python train.py \
 --network build \
 --epochs 40 \
 --batch_size 16 \
---shape 224 \
+--shape 112 \

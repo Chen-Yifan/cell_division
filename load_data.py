@@ -35,8 +35,8 @@ def resample_from_frames(array, input_shape=(1440, 1920),resize_shape=(224,224))
     ''' split by 480 and resize'''
     s = 480
     p = 240
-    num_h = int(h/240)-1
-    num_w = int(w/240)-1
+    num_h = int(h/240)-1 #5
+    num_w = int(w/240)-1 #7
     # loop to add each array to output array: out_array (list)  
     out_array = [] 
     for i in range(num_h):

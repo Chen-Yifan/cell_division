@@ -106,7 +106,7 @@ weights_path = args.ckpt_path + '/weights.{epoch:02d}-{val_loss:.2f}-{val_iou_la
 callbacks = get_callbacks(weights_path, args.ckpt_path, 5)
 history = m.fit_generator(train_gen, epochs=args.epochs,
                           steps_per_epoch = (n_train//BATCH_SIZE),
-                          validation_data=(val_x/255, val_y),
+                          validation_data=(val_x/255., val_y),
                           shuffle = True,
                           callbacks=callbacks)
 #save model structure
@@ -123,7 +123,7 @@ print('======Start Evaluating======')
 BATCH_SIZE = 1 # for test
 # test_gen = testGen(test_x, test_y, BATCH_SIZE)
 # score = m.evaluate_generator(test_gen, steps=(NO_OF_TEST_IMAGES//BATCH_SIZE), verbose=0)
-score = m.evaluate(test_x/255, test_y, verbose=0)
+score = m.evaluate(test_x/255., test_y, verbose=0)
 message = ''
 for j in range(len(score)):
     print("%s: %.2f%%" % (m.metrics_names[j], score[j]*100))
@@ -151,14 +151,7 @@ img = test_x
 real = test_y
 pred = predict_y #after sigmoid 1 channel
 
-predicted_data = np.zeros(pred.shape)
-for i in range(pred.shape[0]):
-    for j in range(pred.shape[1]):
-        for k in range(pred.shape[2]):
-            if (pred[i,j,k]>=0.5):
-                predicted_data[i,j,k] =1
-            else:
-                predicted_data[i,j,k] =0
-
+predicted_data = (pred>0.5).astype('uint8')
 for i in range(100):
     visualize(result_path,img,real,pred,predicted_data,i)
+    
